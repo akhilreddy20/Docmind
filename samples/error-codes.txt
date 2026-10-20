@@ -1,0 +1,11 @@
+Payment Gateway Error Reference
+
+ERR-4012: Card declined by issuing bank. The customer should contact their bank or use a different card. Do not retry automatically.
+
+ERR-5003: Upstream processor timeout. The gateway did not receive a response from the processor within 30 seconds. Safe to retry with the same idempotency key after 60 seconds.
+
+ERR-7781: Duplicate transaction detected. A payment with the same idempotency key was already captured within the last 24 hours. Return the original transaction ID to the caller.
+
+ERR-9100: Merchant account suspended. Escalate to the Risk team via ticket queue RISK-OPS. Engineers cannot unblock this.
+
+INV-2024-0042 refers to the March incident where ERR-5003 rates spiked to 14 percent due to a misconfigured connection pool on processor node pg-east-3.

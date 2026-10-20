@@ -1,0 +1,13 @@
+{
+  "name": "documind",
+  "private": true,
+  "scripts": {
+    "install:all": "npm --prefix apps/api ci && npm --prefix apps/web ci",
+    "infra:up": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:api": "npm --prefix apps/api run dev",
+    "dev:worker": "npm --prefix apps/api run dev:worker",
+    "dev:web": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/api run build && npm --prefix apps/web run build",
+    "test": "npm --prefix apps/api test"
+  }
+}

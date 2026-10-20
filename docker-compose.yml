@@ -1,0 +1,79 @@
+# DocuMind full stack.
+#   docker compose up --build                      # 2 ingestion workers by default
+#   docker compose up --build --scale worker=6     # scale ingestion horizontally
+name: documind
+
+x-api-env: &api-env
+  DATABASE_URL: postgres://documind:documind@postgres:5432/documind
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  MOCK_LLM: ${MOCK_LLM:-false}
+  CHAT_MODEL: ${CHAT_MODEL:-gpt-4o-mini}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+  EMBEDDING_DIM: ${EMBEDDING_DIM:-1536}
+  CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: documind
+      POSTGRES_PASSWORD: documind
+      POSTGRES_DB: documind
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U documind"]
+      interval: 3s
+      retries: 20
+
+  redis:
+    # Redis Stack bundles RediSearch, which powers the HNSW index for the semantic cache.
+    # Plain redis:7 also works: the semantic cache falls back to a bounded brute-force scan.
+    image: redis/redis-stack-server:7.4.0-v1
+    ports: ["6379:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./apps/api
+    command: ["node", "dist/main.js"]
+    environment:
+      <<: *api-env
+      PORT: 4000
+    ports: ["4000:4000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build: ./apps/api
+    command: ["node", "dist/worker.main.js"]
+    environment:
+      <<: *api-env
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    deploy:
+      replicas: 2
+    stop_grace_period: 60s   # let in-flight ingestion jobs finish on shutdown
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:4000}
+    ports: ["3000:3000"]
+    depends_on: [api]
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
